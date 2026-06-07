@@ -1,44 +1,36 @@
 import streamlit as st
 import pandas as pd
-import os
 from streamlit_calendar import calendar
 
-st.set_page_config(page_title="Ruteplanlægger", layout="wide")
+# ... (Dine eksisterende hjælpefunktioner: definer_zone_ud_fra_postnummer etc. beholdes her)
+
 st.title("⚡ Ultra-Hurtig Landsdækkende Årsplanlægger")
 
-# --- 1. DATA LOADING ---
-if os.path.exists('kundeliste.xlsx'):
-    df_kunder = pd.read_excel('kundeliste.xlsx', skiprows=2)
-    df_kunder.columns = df_kunder.columns.astype(str).str.strip()
+# 1. Hent data
+if 'df_plan' not in st.session_state:
+    # Her indlæser du data fra din Excel
+    df = pd.read_excel('kundeliste.xlsx', skiprows=2)
+    # ... (Kør din beregningslogik her, så du får en DataFrame 'df_plan' med kolonnerne: 'Kundenavn', 'Konsulent', 'Dato')
+    st.session_state['df_plan'] = df_plan
 
-    # --- 2. DIN BEREGNINGSLOGIK ---
-    # Her skal dit for-loop være, der bygger 'endelig_52_plan'
-    # For nu bruger jeg en simpel model, så vi kan se kalenderen:
-    endelig_52_plan = []
-    for _, row in df_kunder.iterrows():
-        endelig_52_plan.append({
-            "title": row.get("Navn", "Ukendt Kunde"),
-            "start": "2026-06-08", # Sæt din beregnede dato her
-            "end": "2026-06-08"
+# 2. Vælg konsulent
+df_plan = st.session_state['df_plan']
+valgte_konsulenter = st.multiselect("Vælg konsulent(er) for at se deres ruter:", options=df_plan['Konsulent'].unique())
+
+if valgte_konsulenter:
+    # Filtrer data baseret på valg
+    df_filtreret = df_plan[df_plan['Konsulent'].isin(valgte_konsulenter)]
+    
+    # 3. Klargør events til kalenderen
+    calendar_events = []
+    for _, row in df_filtreret.iterrows():
+        calendar_events.append({
+            "title": f"{row['Kundenavn']} ({row['Konsulent']})",
+            "start": row['Dato'].strftime('%Y-%m-%d'), # Sørg for at din beregning har lavet en 'Dato' kolonne
+            "end": row['Dato'].strftime('%Y-%m-%d')
         })
     
-    df_plan = pd.DataFrame(endelig_52_plan)
-    
-    # --- 3. KALENDER VISNING ---
-    st.header("📅 Online Ruteskema")
-    
-    # Her er den vigtigste linje: Du SKAL kalde calendar() funktionen
-    calendar_options = {
-        "initialView": "dayGridMonth",
-        "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,listWeek"},
-    }
-    
-    # Dette tegner selve kalenderen på skærmen
-    calendar(events=endelig_52_plan, options=calendar_options)
-
-    # --- 4. TABEL VISNING ---
-    st.subheader("📋 Samlet tabel")
-    st.dataframe(df_plan)
-
+    # 4. Vis kalenderen
+    calendar(events=calendar_events, options={"initialView": "dayGridMonth"})
 else:
-    st.error("Filen 'kundeliste.xlsx' blev ikke fundet.")
+    st.info("Vælg venligst en konsulent ovenfor for at se deres kalender.")
