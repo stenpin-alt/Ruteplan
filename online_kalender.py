@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from streamlit_calendar import calendar
 
 st.set_page_config(layout="wide")
-st.title("⚡ Landsdækkende Årsplanlægger")
+st.title("⚡ Ultra-Hurtig Landsdækkende Årsplanlægger")
 
 @st.cache_data
 def load_data():
@@ -27,9 +27,9 @@ if st.button("Generer plan"):
         
         for i, (_, row) in enumerate(df_raw.iterrows()):
             dato = start_dato + timedelta(days=i)
-            # Vi opretter kun de absolut nødvendige felter og sikrer ingen None-værdier
+            # Vi gemmer data med korrekte navne fra din Excel
             plan_data.append({
-                "title": str(row.get("Navn", "Ukendt")),
+                "Navn": str(row.get("Navn", "Ukendt")),
                 "start": dato.strftime('%Y-%m-%d'),
                 "end": dato.strftime('%Y-%m-%d'),
                 "Konsulent": str(row.get("Konsulent", "Ukendt"))
@@ -45,11 +45,11 @@ if st.session_state['df_plan'] is not None:
     
     st.header(f"📅 Kalender for {valgt}")
     
-    # RENSNING TIL KALENDER: Konverter til liste af ordbøger og fjern alt der ikke er 'title', 'start', 'end'
+    # RENSNING: Vi opretter kalender-data ved at bruge det korrekte kolonnenavn "Navn"
     calendar_events = []
     for _, row in df_filt.iterrows():
         calendar_events.append({
-            "title": row["title"],
+            "title": row["Navn"], # HER var fejlen – nu bruger vi "Navn"
             "start": row["start"],
             "end": row["end"]
         })
