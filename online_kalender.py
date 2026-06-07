@@ -1,37 +1,42 @@
 import streamlit as st
 import pandas as pd
+import os
 from datetime import datetime, timedelta
 from streamlit_calendar import calendar
-
-# ... (Dine funktioner: definer_zone_ud_fra_postnummer & afgør_specifikke_dage skal forblive her) ...
 
 st.set_page_config(page_title="Ruteplanlægger", layout="wide")
 st.title("⚡ Ultra-Hurtig Landsdækkende Årsplanlægger")
 
-# --- INDSAMLING AF DATA ---
-kunde_fil = st.file_uploader("Upload Kundeliste (Excel)", type=["xlsx", "xls"])
+# Funktion til automatisk indlæsning
+def get_data():
+    if os.path.exists('kundeliste.xlsx'):
+        return pd.read_excel('kundeliste.xlsx', skiprows=2)
+    return None
 
-if kunde_fil:
-    df_kunder = pd.read_excel(kunde_fil, skiprows=2)
+df_kunder = get_data()
+
+if df_kunder is not None:
     df_kunder.columns = df_kunder.columns.astype(str).str.strip()
-
-    # BEREGNING
-    if st.button("Lyn-generer 52-Ugers Plan", type="primary"):
-        with st.spinner("Beregner..."):
-            # ... (Indsæt hele dit 'for' loop her) ...
-            # Sørg for at variablen 'endelig_52_plan' bliver skabt herinde
-            
-            st.session_state['df_plan_fast'] = pd.DataFrame(endelig_52_plan)
-            st.success("Plan genereret!")
-
-# --- ALTID VIS KALENDER HVIS DATA FINDES ---
-if 'df_plan_fast' in st.session_state and not st.session_state['df_plan_fast'].empty:
-    df_plan = st.session_state['df_plan_fast']
     
-    st.header("📅 Online Ruteskema")
-    # ... (Indsæt din eksisterende kalender-visningskode her) ...
+    # --- BEREGNINGSLOGIK ---
+    # Vi definerer endelig_52_plan her, så den altid findes
+    endelig_52_plan = []
     
-    st.subheader("📋 Samlet tabeloversigt")
-    st.dataframe(df_plan)
+    # Indsæt dit eksisterende for-loop til beregning her:
+    # (Eksempel: for idx, kunde in df_kunder.iterrows(): ...)
+    
+    # Gem resultatet
+    st.session_state['df_plan_fast'] = pd.DataFrame(endelig_52_plan)
+    st.success("Plan genereret automatisk!")
+
+    # --- VISNING ---
+    if 'df_plan_fast' in st.session_state and not st.session_state['df_plan_fast'].empty:
+        df_plan = st.session_state['df_plan_fast']
+        st.header("📅 Online Ruteskema")
+        
+        # [Her indsætter du din kalender-kode fra før]
+        
+    else:
+        st.info("Ingen data fundet i kundeliste.xlsx")
 else:
-    st.info("Upload fil og tryk på knappen for at se kalender og tabel.")
+    st.error("Kunne ikke finde 'kundeliste.xlsx'. Sørg for at den er uploadet til GitHub.")
