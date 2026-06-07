@@ -1,11 +1,13 @@
 import streamlit as st
 import pandas as pd
 import os
+from datetime import datetime, timedelta
+from streamlit_calendar import calendar
 
 st.set_page_config(layout="wide")
 st.title("⚡ Landsdækkende Årsplanlægger")
 
-# 1. Sikker data-indlæsning
+# 1. Dataindlæsning
 @st.cache_data
 def load_data():
     if os.path.exists('kundeliste.xlsx'):
@@ -14,32 +16,39 @@ def load_data():
         return df
     return None
 
-# Initialiser session_state hvis den mangler
+# 2. Initialisering af session state
 if 'df_plan' not in st.session_state:
     st.session_state['df_plan'] = None
 
-df_kunder = load_data()
+df_raw = load_data()
 
-# 2. Knap-logik
-if st.button("Generer plan"):
-    if df_kunder is not None:
-        # Her vil din beregningslogik ligge
-        # Eksempel: Vi tager rådata og gemmer dem som 'df_plan'
-        st.session_state['df_plan'] = df_kunder 
+# 3. Knap-logik: Fordel kunder jævnt over året
+if st.button("Generer plan (Ignorer leveringsdage)"):
+    if df_raw is not None:
+        plan_data = []
+        start_dato = datetime(2026, 1, 5) # Første mandag i 2026
+        
+        # Vi fordeler kunderne med 1 dags interval pr. kunde
+        for i, (_, row) in enumerate(df_raw.iterrows()):
+            dato = start_dato + timedelta(days=i)
+            plan_data.append({
+                "title": row.get("Navn", "Ukendt"),
+                "start": dato.strftime('%Y-%m-%d'),
+                "end": dato.strftime('%Y-%m-%d'),
+                "Konsulent": row.get("Konsulent", "Ukendt")
+            })
+        
+        st.session_state['df_plan'] = pd.DataFrame(plan_data)
         st.success("Plan genereret!")
     else:
-        st.error("Kunne ikke finde 'kundeliste.xlsx'.")
+        st.error("Kunne ikke finde filen.")
 
-# 3. Visning af tabel (kun hvis data findes)
+# 4. Visning
 if st.session_state['df_plan'] is not None:
     df = st.session_state['df_plan']
+    valgt = st.selectbox("Vælg konsulent:", df['Konsulent'].unique())
+    df_filt = df[df['Konsulent'] == valgt]
     
-    # Konsulent-filter
-    if 'Konsulent' in df.columns:
-        valgt_konsulent = st.selectbox("Vælg konsulent:", df['Konsulent'].unique())
-        df_filt = df[df['Konsulent'] == valgt_konsulent]
-        
-        st.header(f"📋 Rute for {valgt_konsulent}")
-        st.dataframe(df_filt, use_container_width=True)
-    else:
-        st.warning("Kolonnen 'Konsulent' blev ikke fundet i Excel-filen.")
+    st.header(f"📅 Kalender for {valgt}")
+    calendar(events=df_filt.to_dict('records'), options={"initialView": "dayGridMonth"})
+    st.dataframe(df_filt)
