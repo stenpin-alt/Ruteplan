@@ -7,57 +7,65 @@ from streamlit_calendar import calendar
 st.set_page_config(page_title="Ruteplanlægger", layout="wide")
 st.title("⚡ Ultra-Hurtig Landsdækkende Årsplanlægger")
 
-# --- HJÆLPEFUNKTION TIL DATOER ---
-def get_date_from_week(year, week, day_of_week):
-    """Konverterer ugenummer og dag (0=Man, 4=Fre) til en dato."""
-    # Find første mandag i året
-    jan1 = datetime(year, 1, 1)
-    # Find første mandag (hvis jan1 er lør/søn, hop til næste uge)
-    first_monday = jan1 + timedelta(days=(7-jan1.weekday()) % 7)
-    # Beregn dato baseret på uge og dag
-    target_date = first_monday + timedelta(weeks=week-1, days=day_of_week)
-    return target_date
+# --- 1. DATO-BEREGNER ---
+def get_date_from_week(year, week_str, day_str):
+    """Omregner 'Uge X' og 'Dag' til en dato i 2026."""
+    try:
+        # Uddrag tal fra "Uge 1" -> 1
+        week_num = int(''.join(filter(str.isdigit, str(week_str))))
+        
+        # Mapping af ugedage
+        days = {"mandag": 0, "tirsdag": 1, "onsdag": 2, "torsdag": 3, "fredag": 4}
+        day_idx = days.get(str(day_str).lower(), 0)
+        
+        # Beregn dato fra årets første mandag
+        jan1 = datetime(year, 1, 1)
+        first_monday = jan1 + timedelta(days=(7-jan1.weekday()) % 7)
+        target_date = first_monday + timedelta(weeks=week_num-1, days=day_idx)
+        return target_date
+    except:
+        return datetime(year, 1, 5) # Fallback dato
 
-# --- BEREGNING ---
-if os.path.exists('kundeliste.xlsx'):
-    df = pd.read_excel('kundeliste.xlsx', skiprows=2)
-    df.columns = df.columns.astype(str).str.strip()
+# --- 2. DATA LOADING ---
+@st.cache_data
+def load_data():
+    if os.path.exists('kundeliste.xlsx'):
+        df = pd.read_excel('kundeliste.xlsx', skiprows=2)
+        df.columns = df.columns.astype(str).str.strip()
+        return df
+    return None
 
+df_kunder = load_data()
+
+if df_kunder is not None:
+    # --- 3. BEREGNING AF RUTER ---
     plan_data = []
-    # HER ER DIT LOOP - Sørg for at du har kolonnerne 'Uge' og 'Dag' i din Excel
-    for _, row in df.iterrows():
-        # Hvis du ikke har 'Uge'/'Dag' i Excel, skal de beregnes her!
-        # Eksempel: Hvis du har en 'Dag'-kolonne med teksten "Mandag"
-        uge = int(row.get('Uge', 1))
-        
-        # Konverter ugedag-tekst til tal (0-4)
-        dag_tekst = str(row.get('Dag', 'Mandag')).lower()
-        dag_tal = 0 # Default til mandag
-        if 'tir' in dag_tekst: dag_tal = 1
-        elif 'ons' in dag_tekst: dag_tal = 2
-        elif 'tor' in dag_tekst: dag_tal = 3
-        elif 'fre' in dag_tekst: dag_tal = 4
-        
-        calc_date = get_date_from_week(2026, uge, dag_tal)
+    for _, row in df_kunder.iterrows():
+        # Beregn unik dato pr. række
+        date_obj = get_date_from_week(2026, row.get('Uge', 'Uge 1'), row.get('Dag', 'Mandag'))
         
         plan_data.append({
-            "title": str(row.get("Navn", "Kunde")),
-            "start": calc_date.strftime('%Y-%m-%d'),
-            "end": calc_date.strftime('%Y-%m-%d'),
+            "title": str(row.get("Kundenavn", "Ukendt")),
+            "start": date_obj.strftime('%Y-%m-%d'),
+            "end": date_obj.strftime('%Y-%m-%d'),
             "Konsulent": str(row.get("Konsulent", "Ukendt"))
         })
     
     df_plan = pd.DataFrame(plan_data)
 
-    # --- VISNING ---
-    konsulenter = df_plan['Konsulent'].unique()
+    # --- 4. VISNING ---
+    konsulenter = sorted(df_plan['Konsulent'].unique())
     valgt = st.selectbox("Vælg konsulent:", konsulenter)
 
+    # Filtrer data
     df_visning = df_plan[df_plan['Konsulent'] == valgt]
     
     st.header(f"📅 Rute for {valgt}")
+    
+    # Vis kalender
     calendar(events=df_visning.to_dict('records'), options={"initialView": "dayGridMonth"})
     
+    # Vis tabel
     st.dataframe(df_visning)
 else:
-    st.error("kundeliste.xlsx mangler.")
+    st.error("Kunne ikke finde 'kundeliste.xlsx'. Tjek filnavnet.")
