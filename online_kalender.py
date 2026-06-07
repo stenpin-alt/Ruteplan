@@ -7,7 +7,6 @@ from streamlit_calendar import calendar
 st.set_page_config(layout="wide")
 st.title("⚡ Landsdækkende Årsplanlægger")
 
-# 1. Indlæs data én gang
 @st.cache_data
 def load_data():
     if os.path.exists('kundeliste.xlsx'):
@@ -18,17 +17,15 @@ def load_data():
 
 df_raw = load_data()
 
-# 2. Initialiser session state til at gemme planen
-if 'df_plan' not in st.session_state:
-    st.session_state['df_plan'] = None
-
-# 3. Knap til at generere planen (bygger den kun én gang)
+# Knap til at generere planen
 if st.button("Generer plan"):
     if df_raw is not None:
+        # NULSTIL: Ryd den gamle plan, før vi bygger en ny
+        st.session_state['df_plan'] = None 
+        
         plan_data = []
         start_dato = datetime(2026, 1, 5)
         
-        # Vi looper kun gennem den rå liste
         for _, row in df_raw.iterrows():
             val = row.get("Besøgsfrekvens", 0.1)
             try:
@@ -51,13 +48,14 @@ if st.button("Generer plan"):
                     "Konsulent": konsulent
                 })
         
+        # Gem den helt friske liste
         st.session_state['df_plan'] = pd.DataFrame(plan_data)
-        st.rerun() # Genindlæs siden så kalenderen opdateres
+        st.rerun() 
     else:
         st.error("Kunne ikke finde 'kundeliste.xlsx'.")
 
-# 4. Visning - bruger altid den gemte version i session_state
-if st.session_state['df_plan'] is not None:
+# Visning
+if 'df_plan' in st.session_state and st.session_state['df_plan'] is not None:
     df = st.session_state['df_plan']
     
     konsulenter = sorted(df['Konsulent'].unique())
