@@ -7,18 +7,22 @@ from streamlit_calendar import calendar
 st.set_page_config(layout="wide")
 st.title("⚡ Landsdækkende Årsplanlægger")
 
-# 1. Funktion der bygger planen fra bunden
 def generer_plan():
     if not os.path.exists('kundeliste.xlsx'):
         return None
         
+    # Læs filen
     df_raw = pd.read_excel('kundeliste.xlsx', skiprows=2)
     df_raw.columns = df_raw.columns.astype(str).str.strip()
+    
+    # SIKKERHED: Fjern dubletter med det samme baseret på Navn
+    df_raw = df_raw.drop_duplicates(subset=['Navn'])
     
     plan_data = []
     start_dato = datetime(2026, 1, 5)
     
     for _, row in df_raw.iterrows():
+        # Hent frekvens
         val = row.get("Besøgsfrekvens", 0.1)
         try:
             frekvens = float(str(val).replace(',', '.'))
@@ -28,6 +32,7 @@ def generer_plan():
         navn = str(row.get("Navn", "Ukendt"))
         konsulent = str(row.get("Konsulent", "Ukendt"))
         
+        # Beregn besøg
         antal_besoeg = max(1, int(52 * frekvens))
         interval = 52 // antal_besoeg
         
@@ -41,15 +46,12 @@ def generer_plan():
             })
     return pd.DataFrame(plan_data)
 
-# 2. Håndtering af state (kun hvis vi trykker på knappen)
-if 'df_final' not in st.session_state:
-    st.session_state['df_final'] = None
-
+# Knap-logik
 if st.button("Generer/Opdater plan"):
     st.session_state['df_final'] = generer_plan()
 
-# 3. Visning
-if st.session_state['df_final'] is not None:
+# Visning
+if 'df_final' in st.session_state and st.session_state['df_final'] is not None:
     df = st.session_state['df_final']
     
     valgt = st.selectbox("Vælg konsulent:", sorted(df['Konsulent'].unique()))
@@ -57,7 +59,6 @@ if st.session_state['df_final'] is not None:
     
     st.header(f"📅 Kalender for {valgt}")
     
-    # Kalender events
     events = [
         {"title": r["Navn"], "start": r["start"], "end": r["end"]} 
         for _, r in df_filt.iterrows()
@@ -65,5 +66,3 @@ if st.session_state['df_final'] is not None:
     
     calendar(events=events, options={"initialView": "dayGridMonth"})
     st.dataframe(df_filt, use_container_width=True)
-else:
-    st.info("Tryk på 'Generer/Opdater plan' for at se kalenderen.")
