@@ -7,23 +7,18 @@ from streamlit_calendar import calendar
 st.set_page_config(layout="wide")
 st.title("⚡ Landsdækkende Årsplanlægger")
 
-# Indlæs rådata direkte (uden cache for at sikre frisk data)
-def load_raw_data():
-    if os.path.exists('kundeliste.xlsx'):
-        df = pd.read_excel('kundeliste.xlsx', skiprows=2)
-        df.columns = df.columns.astype(str).str.strip()
-        return df
-    return None
-
-# Byg planen direkte i selve kørslen
-df_raw = load_raw_data()
-plan_data = []
-
-if df_raw is not None:
+# 1. Funktion der bygger planen fra bunden
+def generer_plan():
+    if not os.path.exists('kundeliste.xlsx'):
+        return None
+        
+    df_raw = pd.read_excel('kundeliste.xlsx', skiprows=2)
+    df_raw.columns = df_raw.columns.astype(str).str.strip()
+    
+    plan_data = []
     start_dato = datetime(2026, 1, 5)
     
     for _, row in df_raw.iterrows():
-        # Hent og konverter frekvens
         val = row.get("Besøgsfrekvens", 0.1)
         try:
             frekvens = float(str(val).replace(',', '.'))
@@ -33,7 +28,6 @@ if df_raw is not None:
         navn = str(row.get("Navn", "Ukendt"))
         konsulent = str(row.get("Konsulent", "Ukendt"))
         
-        # Beregn besøg
         antal_besoeg = max(1, int(52 * frekvens))
         interval = 52 // antal_besoeg
         
@@ -45,22 +39,31 @@ if df_raw is not None:
                 "end": dato.strftime('%Y-%m-%d'),
                 "Konsulent": konsulent
             })
+    return pd.DataFrame(plan_data)
 
-    df = pd.DataFrame(plan_data)
+# 2. Håndtering af state (kun hvis vi trykker på knappen)
+if 'df_final' not in st.session_state:
+    st.session_state['df_final'] = None
+
+if st.button("Generer/Opdater plan"):
+    st.session_state['df_final'] = generer_plan()
+
+# 3. Visning
+if st.session_state['df_final'] is not None:
+    df = st.session_state['df_final']
     
-    # Visning
-    konsulenter = sorted(df['Konsulent'].unique())
-    valgt = st.selectbox("Vælg konsulent:", konsulenter)
+    valgt = st.selectbox("Vælg konsulent:", sorted(df['Konsulent'].unique()))
     df_filt = df[df['Konsulent'] == valgt]
     
     st.header(f"📅 Kalender for {valgt}")
     
-    calendar_events = [
+    # Kalender events
+    events = [
         {"title": r["Navn"], "start": r["start"], "end": r["end"]} 
         for _, r in df_filt.iterrows()
     ]
-        
-    calendar(events=calendar_events, options={"initialView": "dayGridMonth"})
+    
+    calendar(events=events, options={"initialView": "dayGridMonth"})
     st.dataframe(df_filt, use_container_width=True)
 else:
-    st.error("Kunne ikke finde 'kundeliste.xlsx'.")
+    st.info("Tryk på 'Generer/Opdater plan' for at se kalenderen.")
