@@ -1,50 +1,37 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import os
 from streamlit_calendar import calendar
+
+# ... (Dine funktioner: definer_zone_ud_fra_postnummer & afgør_specifikke_dage skal forblive her) ...
 
 st.set_page_config(page_title="Ruteplanlægger", layout="wide")
 st.title("⚡ Ultra-Hurtig Landsdækkende Årsplanlægger")
 
-# 1. Indlæs data automatisk
-def load_data():
-    if os.path.exists('kundeliste.xlsx'):
-        return pd.read_excel('kundeliste.xlsx', skiprows=2)
-    return None
+# --- INDSAMLING AF DATA ---
+kunde_fil = st.file_uploader("Upload Kundeliste (Excel)", type=["xlsx", "xls"])
 
-df_kunder = load_data()
-
-if df_kunder is not None:
-    # Rens kolonner
+if kunde_fil:
+    df_kunder = pd.read_excel(kunde_fil, skiprows=2)
     df_kunder.columns = df_kunder.columns.astype(str).str.strip()
+
+    # BEREGNING
+    if st.button("Lyn-generer 52-Ugers Plan", type="primary"):
+        with st.spinner("Beregner..."):
+            # ... (Indsæt hele dit 'for' loop her) ...
+            # Sørg for at variablen 'endelig_52_plan' bliver skabt herinde
+            
+            st.session_state['df_plan_fast'] = pd.DataFrame(endelig_52_plan)
+            st.success("Plan genereret!")
+
+# --- ALTID VIS KALENDER HVIS DATA FINDES ---
+if 'df_plan_fast' in st.session_state and not st.session_state['df_plan_fast'].empty:
+    df_plan = st.session_state['df_plan_fast']
     
-    # --- Dine hjælpefunktioner ---
-    def definer_zone_ud_fra_postnummer(pnr_val):
-        try:
-            pnr = int(''.join(filter(str.isdigit, str(pnr_val))))
-        except: return "Z_UKENDT_OMRÅDE"
-        if 1000 <= pnr <= 2999: return "Z_STORKØBENHAVN_NORDSJÆLLAND"
-        return "Z_ANDRE" # Simpel version for eksemplets skyld
-
-    def afgør_specifikke_dage(lev_dage_streng):
-        return [0, 1, 2, 3, 4] # Standard alle dage
-
-    # --- Automatisk Beregning (Ingen knap nødvendig) ---
-    with st.spinner("Beregner ruter..."):
-        # Her skal din beregningslogik ligge (det lange 'for' loop fra din gamle kode)
-        # Sørg for at den ender med at definere variablen 'endelig_52_plan'
-        
-        # Eksempel-placeholder (ERSTAT MED DIT EGET LOOP):
-        endelig_52_plan = [] 
-        
-        # Gem resultatet
-        st.session_state['df_plan_fast'] = pd.DataFrame(endelig_52_plan)
-        st.success("Plan genereret!")
-
-    # 2. Vis kalender
-    if 'df_plan_fast' in st.session_state and not st.session_state['df_plan_fast'].empty:
-        st.header("📅 Online Ruteskema")
-        # [Her indsætter du din eksisterende kalender-visningskode]
+    st.header("📅 Online Ruteskema")
+    # ... (Indsæt din eksisterende kalender-visningskode her) ...
+    
+    st.subheader("📋 Samlet tabeloversigt")
+    st.dataframe(df_plan)
 else:
-    st.error("Kunne ikke finde 'kundeliste.xlsx' i mappen. Tjek at den er uploadet til GitHub.")
+    st.info("Upload fil og tryk på knappen for at se kalender og tabel.")
