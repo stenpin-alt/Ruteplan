@@ -7,6 +7,7 @@ from streamlit_calendar import calendar
 st.set_page_config(layout="wide")
 st.title("⚡ Landsdækkende Årsplanlægger")
 
+# 1. Indlæs data én gang
 @st.cache_data
 def load_data():
     if os.path.exists('kundeliste.xlsx'):
@@ -15,20 +16,20 @@ def load_data():
         return df
     return None
 
+df_raw = load_data()
+
+# 2. Initialiser session state til at gemme planen
 if 'df_plan' not in st.session_state:
     st.session_state['df_plan'] = None
 
-df_raw = load_data()
-
-# Knap til at generere planen - KUN hvis den ikke allerede er genereret
+# 3. Knap til at generere planen (bygger den kun én gang)
 if st.button("Generer plan"):
     if df_raw is not None:
         plan_data = []
         start_dato = datetime(2026, 1, 5)
         
-        # Her looper vi igennem hver kunde én gang
+        # Vi looper kun gennem den rå liste
         for _, row in df_raw.iterrows():
-            # Hent frekvens sikkert
             val = row.get("Besøgsfrekvens", 0.1)
             try:
                 frekvens = float(str(val).replace(',', '.'))
@@ -38,11 +39,9 @@ if st.button("Generer plan"):
             navn = str(row.get("Navn", "Ukendt"))
             konsulent = str(row.get("Konsulent", "Ukendt"))
             
-            # Beregn antal besøg og interval
             antal_besoeg = max(1, int(52 * frekvens))
             interval = 52 // antal_besoeg
             
-            # Tilføj besøg for denne specifikke kunde
             for uge in range(0, 52, interval):
                 dato = start_dato + timedelta(weeks=uge)
                 plan_data.append({
@@ -52,13 +51,12 @@ if st.button("Generer plan"):
                     "Konsulent": konsulent
                 })
         
-        # Gem resultatet i session state
         st.session_state['df_plan'] = pd.DataFrame(plan_data)
-        st.rerun() 
+        st.rerun() # Genindlæs siden så kalenderen opdateres
     else:
         st.error("Kunne ikke finde 'kundeliste.xlsx'.")
 
-# Visning - Henter kun fra session_state, ikke fra rådata
+# 4. Visning - bruger altid den gemte version i session_state
 if st.session_state['df_plan'] is not None:
     df = st.session_state['df_plan']
     
@@ -68,7 +66,7 @@ if st.session_state['df_plan'] is not None:
     
     st.header(f"📅 Kalender for {valgt}")
     
-    # Kalenderen viser nu kun de unikke begivenheder for denne konsulent
+    # Klargør data til kalenderen
     calendar_events = [
         {"title": r["Navn"], "start": r["start"], "end": r["end"]} 
         for _, r in df_filt.iterrows()
