@@ -1,36 +1,41 @@
 import streamlit as st
 import pandas as pd
+import os
 from streamlit_calendar import calendar
 
-# ... (Dine eksisterende hjælpefunktioner: definer_zone_ud_fra_postnummer etc. beholdes her)
+st.set_page_config(layout="wide")
 
-st.title("⚡ Ultra-Hurtig Landsdækkende Årsplanlægger")
-
-# 1. Hent data
+# 1. Definer en standardværdi for df_plan i session_state
 if 'df_plan' not in st.session_state:
-    # Her indlæser du data fra din Excel
-    df = pd.read_excel('kundeliste.xlsx', skiprows=2)
-    # ... (Kør din beregningslogik her, så du får en DataFrame 'df_plan' med kolonnerne: 'Kundenavn', 'Konsulent', 'Dato')
-    st.session_state['df_plan'] = df_plan
+    st.session_state['df_plan'] = None
 
-# 2. Vælg konsulent
-df_plan = st.session_state['df_plan']
-valgte_konsulenter = st.multiselect("Vælg konsulent(er) for at se deres ruter:", options=df_plan['Konsulent'].unique())
+# 2. Funktion til at indlæse data
+def load_data():
+    if os.path.exists('kundeliste.xlsx'):
+        return pd.read_excel('kundeliste.xlsx', skiprows=2)
+    return None
 
-if valgte_konsulenter:
-    # Filtrer data baseret på valg
-    df_filtreret = df_plan[df_plan['Konsulent'].isin(valgte_konsulenter)]
-    
-    # 3. Klargør events til kalenderen
-    calendar_events = []
-    for _, row in df_filtreret.iterrows():
-        calendar_events.append({
-            "title": f"{row['Kundenavn']} ({row['Konsulent']})",
-            "start": row['Dato'].strftime('%Y-%m-%d'), # Sørg for at din beregning har lavet en 'Dato' kolonne
-            "end": row['Dato'].strftime('%Y-%m-%d')
-        })
-    
-    # 4. Vis kalenderen
-    calendar(events=calendar_events, options={"initialView": "dayGridMonth"})
+df_kunder = load_data()
+
+# 3. Beregnings-logik (kun hvis filen findes og knappen trykkes)
+if df_kunder is not None:
+    if st.button("Lyn-generer 52-Ugers Plan"):
+        # HER skal dit for-loop ligge, som genererer din plan
+        # Eksempel:
+        # data = []
+        # for ... :
+        #     data.append(...)
+        
+        # Når dit loop er færdigt, opretter du df_plan:
+        df_plan = pd.DataFrame(data) 
+        
+        # Gem den i session_state
+        st.session_state['df_plan'] = df_plan
+        st.success("Plan genereret!")
+
+# 4. Visning (tjekker om df_plan eksisterer, før den bruges)
+if st.session_state['df_plan'] is not None:
+    st.header("📅 Online Ruteskema")
+    # Her kalder du din kalender med st.session_state['df_plan']
 else:
-    st.info("Vælg venligst en konsulent ovenfor for at se deres kalender.")
+    st.info("Upload 'kundeliste.xlsx' og tryk på knappen for at starte.")
