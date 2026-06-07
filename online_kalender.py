@@ -7,41 +7,39 @@ from streamlit_calendar import calendar
 st.set_page_config(layout="wide")
 st.title("⚡ Landsdækkende Årsplanlægger")
 
-# 1. Hent data uden cache for at sikre at vi altid læser den nyeste fil
-def get_data():
-    if os.path.exists('kundeliste.xlsx'):
-        df = pd.read_excel('kundeliste.xlsx', skiprows=2)
-        df.columns = df.columns.astype(str).str.strip()
-        return df
-    return None
+# Læs data og fjern ALT der ligner dubletter med det samme
+def get_clean_data():
+    if not os.path.exists('kundeliste.xlsx'):
+        return None
+    df = pd.read_excel('kundeliste.xlsx', skiprows=2)
+    df.columns = df.columns.astype(str).str.strip()
+    # Fjern rækker der er 100% ens
+    return df.drop_duplicates()
 
-# 2. Hovedlogik
-df_raw = get_data()
+df_raw = get_clean_data()
 
 if df_raw is not None:
     plan_data = []
-    # Startdato er altid en mandag
-    start_dato = datetime(2026, 1, 5) 
+    start_dato = datetime(2026, 1, 5)
     
-    for _, row in df_raw.iterrows():
-        navn = str(row.get("Navn", "Ukendt"))
-        konsulent = str(row.get("Konsulent", "Ukendt"))
+    # Vi bruger 'itertuples' i stedet for 'iterrows' - det er hurtigere og mere stabilt
+    for row in df_raw.itertuples(index=False):
+        # Hent værdier med 'getattr' for at undgå fejl
+        navn = str(getattr(row, 'Navn', 'Ukendt'))
+        konsulent = str(getattr(row, 'Konsulent', 'Ukendt'))
+        val = getattr(row, 'Besøgsfrekvens', 0.1)
         
-        # Frekvens logik
         try:
-            val = row.get("Besøgsfrekvens", 0.1)
             frekvens = float(str(val).replace(',', '.'))
         except:
             frekvens = 0.1
         
-        # Beregn antal besøg (f.eks. 0.1 = 5 besøg om året)
         antal_besoeg = max(1, int(52 * frekvens))
         interval = 52 // antal_besoeg
         
-        # Fordel besøg jævnt ved at lægge uger til startdatoen
         for i in range(antal_besoeg):
             dato = start_dato + timedelta(weeks=i * interval)
-            # Sørg for vi holder os indenfor 2026
+            # Tilføj kun hvis året er 2026
             if dato.year == 2026:
                 plan_data.append({
                     "Navn": navn,
@@ -50,21 +48,19 @@ if df_raw is not None:
                     "Konsulent": konsulent
                 })
 
-    df_plan = pd.DataFrame(plan_data)
+    # Skab en helt ny dataframe og fjern eventuelle dubletter herfra også
+    df_plan = pd.DataFrame(plan_data).drop_duplicates()
 
-    # 3. Visning
-    valgt = st.selectbox("Vælg konsulent:", sorted(df_plan['Konsulent'].unique()))
+    # Visning
+    konsulenter = sorted(df_plan['Konsulent'].unique())
+    valgt = st.selectbox("Vælg konsulent:", konsulenter)
     df_filt = df_plan[df_plan['Konsulent'] == valgt]
     
     st.header(f"📅 Kalender for {valgt}")
     
-    # Konverter til kalender format
     events = [{"title": r["Navn"], "start": r["start"], "end": r["end"]} for _, r in df_filt.iterrows()]
     
     calendar(events=events, options={"initialView": "dayGridMonth"})
-    
-    st.subheader("Data detaljer")
     st.dataframe(df_filt, use_container_width=True)
-
 else:
     st.error("Kunne ikke finde 'kundeliste.xlsx'.")
